@@ -1,0 +1,529 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<form>
+  <!-- Le nom de la balise principale n'a pas d'impact -->
+  <localhost>
+    <!-- Nom de la "zone" de configuration à la Zend. Permet de définir plusieurs configurations dans un même fichier -->
+    <user>
+      <passageSession>
+      </passageSession>
+      <!-- _____________________	Configuration Zend du formulaire
+  __________________________________________________________________ -->
+      <formConfig>
+        <name>frm_AssTr_DcCourrierEmisToRestore_List</name>
+        <!-- L'id html du formulaire : <form id="...  -->
+        <method>post</method>
+        <elements>
+          <variables_session>
+            <type>textarea</type>
+            <options>
+              <readonly/>
+              <value>Var session = ?</value>
+              <cols>100</cols>
+              <rows>1</rows>
+            </options>
+          </variables_session>
+
+          <liste_tableau>
+            <type>textarea</type>
+          </liste_tableau>
+
+          <e_ModifFiltre>
+            <type>textarea</type>
+            <options>
+              <readonly/>
+              <cols>100</cols>
+              <rows>3</rows>
+            </options>
+          </e_ModifFiltre>
+
+          <submitSauver>
+            <type>submit</type>
+            <options>
+              <label>Restaurer</label>
+            </options>
+          </submitSauver>
+          <submitAnnuler>
+            <type>submit</type>
+            <options>
+              <label>Retour</label>
+            </options>
+          </submitAnnuler>
+
+          <e_selection>
+            <type>hidden</type>
+          </e_selection>
+        </elements>
+      </formConfig>
+      <!-- ______________________________________________________________________
+
+          Configuration "métier" spécifique du formulaire
+      ____________________________________________________________________________ -->
+      <formConfigSql>
+        <!-- __________________________________   Alimentation des champs   ___________________________________________ -->
+        <defaultValues>
+          <!-- __________________________________  SQL de lecture de l'objet affiche  __________________________________________ -->
+          <champsTexte>
+            <defautValue>
+              <sql>SELECT CONCAT('ClientId=',IFNULL(%SESSION_ClientId%,'null')
+            , ' ; UserId=',IFNULL(%SESSION_UserId%,'null')
+            , ' ; DossierId=',IFNULL(%SESSION_DossierId%,'null')
+            , ' ; PersonneProtegeeId=',IFNULL(%SESSION_PersonneProtegeeId%,'null')
+            , ' ; PersonneId=',IFNULL(%SESSION_PersonneId%,'null')
+            , ' ; FiltreName=',IFNULL('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%','null')
+            ) AS variables_session;
+              </sql>
+            </defautValue>
+
+            <defautValue for="liste_tableau" liste="liste">
+              <sql>
+              SELECT DISTINCT d.Id AS donneeListe
+                , CONCAT(ChronoClientType,'|',if(d.fkVariante is not null and v.xStatut='Temporaire','Publip.','')) AS 'Chrono|Publip.'
+                , CONCAT( IF(d.fkDossier=0,'*** GLOBAL ***',p.Denomination_NP)
+                    , '|', IFNULL(en.LibelleCourt,'')
+                    ) AS 'Dossier|Entité'
+                , CONCAT(DATE_FORMAT(d.DCreation, '%%d%/%%m/%%y %%H:%%i'), '|', DATE_FORMAT(d.DMaj, '%%d%/%%m/%%y %%H:%%i')) AS 'Création|Supprimé le'
+                , d.c_destinataire AS 'Destinataire'
+                , d.Intitule AS 'Intitulé'
+                , CONCAT(IFNULL(stat.LibelleCourt,'')
+                    ,IF(d.TypeEnvoi!='Mail',IFNULL(CONCAT('\n',IF(CHAR_LENGTH(histo.shortstatus) #sup# 20,CONCAT(LEFT(histo.shortstatus,20),'...'),histo.shortstatus)),''),'')
+                    ,IFNULL(CONCAT('\n',HtmlLinkLRAR(Courrier_NumLRAR)),'')
+                    ) AS 'Statut'
+                , CONCAT(pe.trigramme,'|',pee.trigramme) AS 'Rédac.|Sign.'
+                , d.TypeEnvoi AS 'Type\nEnvoi'
+                , CONCAT('DOWN:act_DcCourrierEmis_CompleteRead_Restore?SESSION_DocumentId=', d.Id, '#et#SESSION_ProcessName=prc_DcCourrierEmis_Restore#et#SESSION_DossierId=', d.fkDossier) AS META_NAVIGATION
+                , CONCAT('{"all" : "',IF(d.xStatut='EchecEnvoi' OR histo.state=200,'color:red@ font-weight:bold',''),'"}') AS 'CSS_STYLE'
+                , CONCAT('{"all" : "',IF(d.xStatut!='EnvoyeManuellement' and (d.xStatut='EchecEnvoi' OR histo.state=200),REPLACE( histo.shortstatus,'"',' '),''),'"',
+                          ',"Type&lt;br/&gt;envoi" : "',IF(d.TypeEnvoi='Mail','Envoi mail',IF(d.TypeEnvoi='Lettre','Envoi postal','')),'"'
+                                  ',"Chrono|Publip." : "',IF(d.fkVariante is not null and v.xStatut='Temporaire',CONCAT('Publi #',d.fkVariante),''),'"'
+                          ,'}') AS 'INFO_BULLE'
+              FROM dccourrieremis_shortread d
+              LEFT join cor_ct_variante v ON (v.fkClient=d.fkClient AND v.Id=d.fkVariante)
+              JOIN hab_user_acces_c hab ON hab.fkClient=d.fkClient AND hab.fkUser=%SESSION_UserId% AND hab.xType='habUsrDosAcces' AND topListeTrans='1' AND hab.fkDossier=IFNULL(d.fkDossier,0)
+              LEFT JOIN peprotegee_shortread p ON (d.fkclient = p.fkclient AND d.fkdossier = p.fkdossier)
+              LEFT JOIN do_dossier do ON (do.fkclient=d.fkclient AND do.Id=d.fkDossier)
+              LEFT JOIN do_entite en ON (en.fkClient = do.fkClient AND en.Id = do.fkEntite)
+              LEFT JOIN peusers_shortread pe on pe.fkClient=d.fkClient AND pe.jos_users_id=d.fkRedacteur
+              LEFT JOIN peusers_shortread pee on pee.fkClient=d.fkClient AND pee.jos_users_id=d.fkSignataire
+              LEFT JOIN nmdccoemisaffr n on (n.Name=d.Courrier_Envoi_Affr)
+              LEFT JOIN nmdccoemisnb_c nb on (nb.Name=d.Courrier_Envoi_NB_Couleur)
+              LEFT JOIN nmdccoemisarchstd archs on (archs.Name = d.ArchStdDuree)
+              LEFT JOIN nmdccoemisarchlegal archl on (archs.Name=d.ArchLegDuree)
+              LEFT JOIN histo_courrier histo ON (histo.id_doc=d.Id AND histo.id_client=d.fkClient AND (histo.state=200 OR histo.shortstatus='EchecEnvoi'))
+              LEFT JOIN nmdccoemisstatut stat on (stat.Name=d.xStatut)
+              WHERE d.fkClient=%SESSION_ClientId% AND d.TopSuppr = 1
+                <!-- Critere Dossier (position 1) -->
+                AND (CASE WHEN ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 1)!='' THEN d.fkDossier=ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 1)
+                  ELSE 1=1
+                  END)
+                <!-- Critere Date (position 2 à 3) -->
+                AND d.DMAJ BETWEEN IF(ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 2)='',DATE_ADD(CURDATE(), INTERVAL -1 MONTH),ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 2))
+                         AND DATE_ADD(IF(ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 3)='',CURDATE(),ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 3)), INTERVAL 1 DAY)
+                <!-- Critere Statut (position 4) -->
+                AND (CASE WHEN ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 4)!='' THEN d.xStatut=ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 4)
+                  ELSE 1=1
+                  END)
+                <!-- Critere numLRAR (position 5) -->
+                AND (CASE WHEN ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 5)!=''
+                      THEN RetirePonctu(SupprEspaceTous(Courrier_NumLRAR))
+                          LIKE CONCAT('%%',RetirePonctu(SupprEspaceTous(ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 5))),'%%')
+                      ELSE 1=1
+                  END)
+                <!-- Critere ChronoClientType (position 6) -->
+                AND (CASE WHEN ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 6)!='' THEN ChronoClientType=ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 6)
+                  ELSE 1=1
+                  END)
+                <!-- Critere TypeEnvoi (position 7) -->
+                AND (CASE
+                    WHEN ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 7)='Lettre'
+                      THEN ISNULL(d.TypeEnvoi) OR d.TypeEnvoi='Lettre'
+                    WHEN ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 7)!=''
+                      THEN d.TypeEnvoi=ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 7)
+                  ELSE 1=1
+                  END)
+                <!-- Critere fkEntite (position 8) -->
+                AND (CASE WHEN ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 8)!='' THEN do.fkEntite=ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 8)
+                  ELSE 1=1
+                  END)
+                <!-- Critere fkRedacteur (position 9) -->
+                AND (CASE WHEN ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 9)!='' THEN d.fkRedacteur=ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 9)
+                  ELSE 1=1
+                  END)
+                <!-- Critere fkSignataire (position 10) -->
+                AND (CASE WHEN ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 10)!='' THEN d.fkSignataire=ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 10)
+                  ELSE 1=1
+                  END)
+                <!-- Critere fkVariante (position 11) -->
+                AND (CASE WHEN ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 11)!='' THEN d.fkVariante=ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 11)
+                  ELSE 1=1
+                  END)
+              GROUP BY d.Id
+              ORDER BY d.DMaj DESC;
+              </sql>
+              <tri>
+                <champ  libelle="Création">
+                  <champsql  ordre="croissant">d.DCreation ASC</champsql>
+                  <champsql  ordre="decroissant">d.DCreation DESC</champsql>
+                </champ>
+                <champ  libelle="Supprimé le">
+                  <champsql  ordre="croissant">d.DMaj ASC</champsql>
+                  <champsql  ordre="decroissant">d.DMaj DESC</champsql>
+                </champ>
+                <champ  libelle="Chrono">
+                  <champsql  ordre="croissant">d.ChronoClientType ASC</champsql>
+                  <champsql  ordre="decroissant">d.ChronoClientType DESC</champsql>
+                </champ>
+                <champ  libelle="Publip.">
+                  <champsql  ordre="croissant">d.fkVariante ASC</champsql>
+                  <champsql  ordre="decroissant">d.fkVariante DESC</champsql>
+                </champ>
+                <champ  libelle="Dossier">
+                  <champsql  ordre="croissant">IF(d.fkDossier=0,'*** GLOBAL ***',p.Denomination_NP) ASC</champsql>
+                  <champsql  ordre="decroissant">IF(d.fkDossier=0,'*** GLOBAL ***',p.Denomination_NP) DESC</champsql>
+                </champ>
+                <champ  libelle="Entité">
+                  <champsql  ordre="croissant">IFNULL(en.LibelleCourt,'') ASC</champsql>
+                  <champsql  ordre="decroissant">IFNULL(en.LibelleCourt,'') DESC</champsql>
+                </champ>
+                <champ  libelle="Rédac.">
+                  <champsql  ordre="croissant">pe.trigramme ASC</champsql>
+                  <champsql  ordre="decroissant">pe.trigramme DESC</champsql>
+                </champ>
+                <champ  libelle="Sign.">
+                  <champsql  ordre="croissant">pee.trigramme ASC</champsql>
+                  <champsql  ordre="decroissant">pee.trigramme DESC</champsql>
+                </champ>
+
+              </tri>
+              <checktable id="unIdObligatoire" post="e_selection" libelle="Sél." position="gauche"/>
+              <liste>donneeListe</liste>
+            </defautValue>
+          </champsTexte>
+          <!-- ______________________________  SQL d'alimentation des listes deroulantes _______________________________________ -->
+          <listesReference/>
+        </defaultValues>
+
+        <defautValuesHtml>
+          <defautValue for="Filtre">
+            <sql>
+          SELECT
+                  IF( ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 1) = ''
+                  , 'Tous'
+                  , (SELECT IFNULL(Denomination_NP,'-') AS DenominationNP
+                      FROM peprotegee_shortread
+                      WHERE fkClient = %SESSION_ClientId% AND fkDossier = ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 1)
+                            ORDER BY DenominationNP
+                            LIMIT 1)
+                  ) AS v_fkDossier
+                , IF( ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 2)='',DATE_ADD(CURDATE(), INTERVAL -1 MONTH),ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 2)) AS v_DateMin
+                , IF( ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 3)='',CURDATE(),ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 3)) AS v_DateMax
+                , CONCAT('Date de suppression entre le &lt;b&gt;'
+                      , DATE_FORMAT(IF(ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 2)='',DATE_ADD(CURDATE(), INTERVAL -1 MONTH),ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 2)), '%%d%/%%m%/%%Y')
+                      ,'&lt;/b&gt; et le &lt;b&gt;'
+                      , DATE_FORMAT(IF(ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 3)='',CURDATE(),ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 3)), '%%d%/%%m%/%%Y')
+                      ,'&lt;/b&gt;') AS v_Date
+                , IF( ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 4) = ''
+                  , 'Tous'
+                  , (SELECT IFNULL(LibelleCourt,'')
+                       FROM nmdccoemisstatut
+                       WHERE Name = ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 4))
+                  ) AS v_xStatut
+                , ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 5) AS v_numLRAR
+                , ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 6) AS v_numChrono
+                , IF( ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 7) = ''
+                  , 'Tous'
+                  , ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 7)
+                  ) AS v_type_envoi
+                , IF( ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 8) = ''
+                  , 'Toutes'
+                  , (SELECT IFNULL(LibelleLong, IFNULL(LibelleCourt,''))
+                       FROM do_entite
+                       WHERE fkClient=%SESSION_ClientId%
+                         AND Id = ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 8))
+                  ) AS v_entite
+                , IF( ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 9) = '' or ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 9) = -1
+                  , 'Tous'
+                  , (SELECT Denomination_NP_initiale
+                      FROM peusers usr
+                      WHERE usr.fkClient = %SESSION_ClientId%
+                      AND usr.jos_users_id = ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 9))
+                  ) AS v_fkRedacteur
+                , IF( ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 10) = '' or ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 10) = -1
+                  , 'Tous'
+                  , (SELECT CONCAT(IFNULL(usr.trigramme,''), ' (', IFNULL(usr.denomination_NP,'-'),')')
+                      FROM peusers usr
+                      WHERE usr.fkClient = %SESSION_ClientId%
+                      AND usr.jos_users_id = ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 10))
+                  ) AS v_fkSignataire
+                , ExtractString('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%', '|', 11) AS v_numPubli
+                , CONCAT('ClientId=',IFNULL(%SESSION_ClientId%,'null')
+                    , ' ; UserId=',IFNULL(%SESSION_UserId%,'null')
+                    , ' ; DossierId=',IFNULL(%SESSION_DossierId%,'null')
+                    , ' ; FiltreName=', IFNULL('%SESSION_ctxActAssTr_DcCourrierEmisToRestoreFiltre%','null')
+                    ) AS v_session
+          ;
+            </sql>
+            <html>
+              <div class="font_default_color">
+                <table style="width:80%;border-collapse:collapse; border: 0px solid; margin:auto;">
+                  <tr>
+                    <td colspan="3" style="padding:5px;">
+                      <var>v_Date</var>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="width:30%;padding:5px;">Type d'Envoi : <b>
+                        <var>v_type_envoi</var>
+                      </b>
+                    </td>
+                    <td style="width:30%;padding:5px;">Statut : <b>
+                        <var>v_xStatut</var>
+                      </b>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="width:30%;padding:5px;">Rédacteur : <b>
+                        <var>v_fkRedacteur</var>
+                      </b>
+                    </td>
+                    <td style="width:30%;padding:5px;">Signataire : <b>
+                        <var>v_fkSignataire</var>
+                      </b>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="width:30%;padding:5px;">Entité : <b>
+                        <var>v_entite</var>
+                      </b>
+                    </td>
+                    <td style="width:30%;padding:5px;">Protégé : <b>
+                        <var>v_fkDossier</var>
+                      </b>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="width:30%;padding:5px;">N° chrono : <b>
+                        <var>v_numChrono</var>
+                      </b>
+                    </td>
+                    <td style="width:30%;padding:5px;">N° de recommandé : <b>
+                        <var>v_numLRAR</var>
+                      </b>
+                    </td>
+                    <td style="width:30%;padding:5px;">N° de publipostage : <b>
+                        <var>v_numPubli</var>
+                      </b>
+                    </td>
+                  </tr>
+                </table>
+              </div>
+            </html>
+          </defautValue>
+        </defautValuesHtml>
+
+        <!-- ______________________________  SQL de definition des listes de liens _____________________________________________ -->
+        <liens/>
+        <!-- _________________________________    SQL des actions     _____________________________________________ -->
+        <actions>
+          <submitSauver>
+            <validation>
+              <sql>
+              CALL PS_Charge_5_VariableSession_Val(@xml
+                        , NULL, NULL
+                        , NULL, NULL
+                        , NULL, NULL
+                        , NULL, NULL
+                        , 'ctxActAssTr_DcCourrierEmisToRestore_RestoreMulti'
+                        , IFNULL(%FIELD_e_selection%,''));
+              SELECT @xml;
+              </sql>
+            </validation>
+          </submitSauver>
+        </actions>
+      </formConfigSql>
+      <!-- 	_____________________________________________________________________
+              Mise en page du formulaire
+      _____________________________________________________________________ -->
+      <formConfigLayout>
+        <gauche>
+          <sql>
+            SELECT
+              "Fusion" AS groupement
+              , CONCAT('Annuaire - Correspondants') AS libelle
+              , 'TRANS:/../act_ObGenerique_FusionCorrespondant' AS lien
+              , 'Permet de fusionner deux correspondants de l''annuaire' AS infoBulle
+              , 0 AS popup
+            UNION
+            <!-- SELECT -->
+              <!-- "Correspondances" AS groupement -->
+              <!-- , CONCAT('Codes comptables') AS libelle -->
+              <!-- , 'DOWN:/../act_CorrespCpta_CodesComptables_List?SESSION_ctxCorrespCpta_CodesComptables_ListFiltre=||||||#et#SESSION_ctxCorrespCpta_CodesComptables_ListFiltre_sqlString=' AS lien -->
+              <!-- , 'Permet de gérer la correspondance entre les anciens codes nature et codes comptable Proxima' AS infoBulle -->
+              <!-- , 0 AS popup -->
+              <!-- FROM (select 1) a where %SESSION_ClientId% in (54,10100332,10000054,101475,101483,101480,101476,101474,101478,101467) -->
+            <!-- UNION -->
+            SELECT
+              "Fusion" AS groupement
+              , CONCAT('Fusionner des documents') AS libelle
+              , 'TRANS:MonBureau/act_CliBoiteOutils/act_Asstr_DcDocFusion_Filtre' AS lien
+              , 'Permet de fusionner plusieurs documents entre eux' AS infoBulle
+              , 0 AS popup
+            UNION
+            SELECT
+              "Correspondances" AS groupement
+              , CONCAT('Nature des correspondants de l''annuaire') AS libelle
+              , 'TRANS:/../act_CorrespPeNatureCorrespondants_List?' AS lien
+              , 'Permet de gérer la correspondance des correspondants de l''annuaire' AS infoBulle
+              , 0 AS popup
+              FROM (select 1) a where %SESSION_ClientId% in (54,10100332,10000054,101475,101483,101480,101476,101474,101478,101467)
+            UNION
+            SELECT
+              "Correspondances" AS groupement
+              , CONCAT('Nature de contrats') AS libelle
+              , 'TRANS:/../act_CorrespObNatureContrats_List?' AS lien
+              , 'Permet de gérer la correspondance des natures de contrat' AS infoBulle
+              , 0 AS popup
+              FROM (select 1) a where %SESSION_ClientId% in (54,10100332,10000054,101475,101483,101480,101476,101474,101478,101467)
+            UNION
+            SELECT
+              "Transfert" AS groupement
+              , CONCAT('Dossiers') AS libelle
+              , 'TRANS:/../act_DoDossier_Transfert' AS lien
+              , 'Permet de transférer tous les dossiers actifs d''un utilisateur vers un autre' AS infoBulle
+              , 0 AS popup
+            UNION
+            SELECT
+              "Transfert" AS groupement
+              , CONCAT('Dossiers en masse') AS libelle
+              , 'TRANS:/../act_DoDossier_Transfert_Masse' AS lien
+              , 'Permet de transférer en masse des dossiers avec options avancées à partir de critères de filtre' AS infoBulle
+              , 0 AS popup
+            UNION
+            SELECT
+              "Gestion corbeille" AS groupement
+              , CONCAT('Courriers émis') AS libelle
+              , 'TRANS:/act_CliBoiteOutils/act_AssTr_DcCourrierEmisToRestore_List' AS lien
+              , 'Permet de restaurer un courrier supprimé depuis - de 30 jours' AS infoBulle
+              , 0 AS popup
+            UNION
+            SELECT
+              "Gestion corbeille" AS groupement
+              , CONCAT('Documents chargés') AS libelle
+              , 'TRANS:/act_CliBoiteOutils/act_AssTr_DcDocRecusToRestore_List' AS lien
+              , 'Permet de restaurer un document supprimé depuis - de 30 jours' AS infoBulle
+              , 0 AS popup
+            UNION
+            SELECT
+              "Gestion corbeille" AS groupement
+              , CONCAT('Rapports') AS libelle
+              , 'TRANS:/act_CliBoiteOutils/act_AssTr_DcRapportToRestore_List' AS lien
+              , 'Permet de restaurer un rapport supprimé depuis - de 30 jours' AS infoBulle
+              , 0 AS popup
+            UNION
+            SELECT
+              "Gestion corbeille" AS groupement
+              , CONCAT('Mails reçus') AS libelle
+              , 'TRANS:/act_CliBoiteOutils/act_AssTr_MsgMailInToRestore_List' AS lien
+              , 'Permet de restaurer un mail MP supprimé depuis - de 30 jours' AS infoBulle
+              , 0 AS popup
+            UNION
+            SELECT
+              "Suppression" AS groupement
+              , CONCAT('Dossiers archivés') AS libelle
+              , 'TRANS://..//act_AssTr_PeProtegeeToDelete_List?SESSION_ProcessName=prc_AssTr_PeProtegeeToDelete' AS lien
+              , 'Permet de supprimer en masse des dossiers archivés à partir de critères de filtre' AS infoBulle
+              , 0 AS popup
+            UNION
+            SELECT
+              "Suppression" AS groupement
+              , CONCAT('Documents chargés') AS libelle
+              , 'TRANS://..//act_AssTr_DcDocRecusToDelete_List?SESSION_ProcessName=prc_AssTr_DcDocRecusToDelete' AS lien
+              , 'Permet de supprimer en masse des documents chargés à partir de critères de filtre' AS infoBulle
+              , 0 AS popup
+            UNION
+            SELECT
+              "Suppression" AS groupement
+              , CONCAT('Courriers émis') AS libelle
+              , 'TRANS://..//act_AssTr_DcCourrierEmisToDelete_List?SESSION_ProcessName=prc_AssTr_DcCourrierEmisToDelete' AS lien
+              , 'Permet de supprimer en masse des courriers émis à partir de critères de filtre' AS infoBulle
+              , 0 AS popup
+            UNION
+            SELECT
+              "Participation MP" AS groupement
+              , CONCAT('Supp. Années de ressources') AS libelle
+              , 'TRANS://..//act_AssTr_SitAssiette_MultiDelete' AS lien
+              , 'Permet de supprimer en masse des des années de ressources' AS infoBulle
+              , 0 AS popup
+            UNION
+            SELECT
+              "Participation MP" AS groupement
+              , CONCAT('Valid. Années de ressources') AS libelle
+              , 'TRANS://..//act_AssTr_SitAssiette_MultiValid' AS lien
+              , 'Permet de valider en masse des ressources' AS infoBulle
+              , 0 AS popup
+            UNION
+            SELECT
+              "Participation MP" AS groupement
+              , CONCAT('Suppimer des ressources') AS libelle
+              , 'TRANS://..//act_AssTr_RessAssiette_MultiDelete' AS lien
+              , 'Permet de supprimer en masse des des années de ressources' AS infoBulle
+              , 0 AS popup
+            UNION
+            SELECT
+              "Participation MP" AS groupement
+              , CONCAT('Valider des ressources') AS libelle
+              , 'TRANS://..//act_AssTr_RessAssiette_MultiValid' AS lien
+              , 'Permet de valider en masse des ressources' AS infoBulle
+              , 0 AS popup
+            UNION
+            SELECT
+              "Participation MP" AS groupement
+              , CONCAT('Statuts des factures') AS libelle
+              , 'TRANS://..//act_AssTr_FactAssiette_MultiValid' AS lien
+              , 'Permet de valider en masse des factures' AS infoBulle
+              , 0 AS popup
+            UNION
+            SELECT
+              "Contrôle" AS groupement
+              , CONCAT('Dates incohérentes') AS libelle
+              , 'TRANS://..//act_AssTr_ObGeneriqueDateErreur_List' AS lien
+              , 'Documents dont le classement (univers, nature) est incohérent avec le contrat de rattachement' AS infoBulle
+              , 0 AS popup
+            UNION
+            SELECT
+              "Contrôle" AS groupement
+              , CONCAT('Contrats/Docs incohérents') AS libelle
+              , 'TRANS:/act_CliBoiteOutils/act_AssTr_DcDocRecusNatureErreur_List' AS lien
+              , 'Tous les contrats ayant des dates incohérentes (inférieures à l\'an 1900)' AS infoBulle
+              , 0 AS popup
+            UNION
+            SELECT
+              "Contrôle" AS groupement
+              , CONCAT('Publipostage') AS libelle
+              , 'TRANS:/../act_CliBoiteOutils_Publi' AS lien
+              , '' AS infoBulle
+              , 0 AS popup
+              FROM (select 1) a where %SESSION_ClientId% IN (10000054, 54, 101300);
+          </sql>
+        </gauche>
+        <zone titre="Critères de filtre appliqués" id="zone1">
+          <groupement>
+            <!-- <input id="variables_session" type="note" /> -->
+            <html id="Filtre" />
+          </groupement>
+          <groupement type="static">
+            <input id="e_ModifFiltre" bouton="bas">
+              <lienPopup libelle="Modifier le filtre" url="NOPOPUP" idForm="act_AssTr_DcCourrierEmisToRestore_Filtre" />
+            </input>
+          </groupement>
+          <displayButtons>true</displayButtons>
+        </zone>
+        <zone titre="Liste des courriers émis" id="zone2">
+          <groupement>
+            <input id="e_selection"/>
+            <input id="liste_tableau" liste="liste"/>
+          </groupement>
+        </zone>
+      </formConfigLayout>
+    </user>
+  </localhost>
+</form>
